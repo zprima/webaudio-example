@@ -1,8 +1,6 @@
 # Web Audio example
 
-<p>Run this folder inside a server</p>
+Run this folder inside a server
 
-<p>
-  Example on a mac running PHP server
-  `php -S 127.0.0.1:3000`
-</p>
+Example on a mac running PHP server
+`php -S 127.0.0.1:3000`
