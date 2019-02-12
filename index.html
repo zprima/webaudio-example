@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+
+  <script src="chroma.min.js"></script>
+</head>
+
+<body>
+  <div>
+    <button>ALLOW audio+canvas</button>
+  </div>
+
+  <div id="audio_box"></div>
+
+  <div>
+    <canvas class="waveform" width="640" height="100"></canvas>
+    <br>
+    <canvas class="barform" width="640" height="100"></canvas>
+    <br>
+    <canvas class="spectrogram"></canvas>
+    <canvas class="spectrogramtmp" style="display:none" ;></canvas>
+  </div>
+
+  <script>
+    var audio = new Audio();
+    audio.src = './bensound-energy.mp3';
+    // audio.src = './bensound-hey.mp3';
+    // audio.src = './a.mp3';
+    // audio.src = './b.mp3';
+    audio.controls = true;
+    audio.loop = true;
+    audio.autoplay = true;
+
+    document.getElementById('audio_box').appendChild(audio);
+
+    document.querySelector('button').addEventListener('click', function () {
+
+      var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var analyser = audioCtx.createAnalyser();
+
+      var source = audioCtx.createMediaElementSource(audio);
+      source.connect(analyser);
+
+      analyser.connect(audioCtx.destination);
+
+      analyser.fftSize = 1024; //2048;
+      var bufferLength = analyser.frequencyBinCount;
+      var dataArray = new Uint8Array(bufferLength);
+      var dataFArray = new Uint8Array(bufferLength);
+
+      var canvasWF = document.querySelector('.waveform');
+      var canvasWFCtx = canvasWF.getContext("2d");
+
+      var canvasBF = document.querySelector('.barform');
+      var canvasBFCtx = canvasBF.getContext("2d");
+
+      var WIDTH_WF = canvasWF.width;
+      var HEIGHT_WF = canvasWF.height;
+
+      var WIDTH_BF = canvasWF.width;
+      var HEIGHT_BF = canvasWF.height;
+
+      // scpetrogram 
+      var tempCanvas = document.querySelector(".spectrogramtmp"),
+        tempCtx = tempCanvas.getContext("2d");
+      tempCanvas.width = 800;
+      tempCanvas.height = 512;
+
+      var array = new Uint8Array(bufferLength);
+
+      // used for color distribution
+      var hot = chroma.scale('Spectral').domain([255, 0]);
+
+      var canvas = document.querySelector(".spectrogram");
+      canvas.width = 800;
+      canvas.height = 512;
+      var ctx = canvas.getContext("2d");
+
+      function drawSpectrogram(array) {
+
+        // copy the current canvas onto the temp canvas
+        tempCtx.drawImage(canvas, 0, 0, 800, 512);
+
+
+        // iterate over the elements from the array
+        for (var i = 0; i < array.length; i++) {
+          // draw each pixel with the specific color
+          var value = array[i];
+          if (value == 0) {
+            ctx.fillStyle = 'rgb(0,0,0)';
+          } else {
+            ctx.fillStyle = hot(value).hex();
+          }
+
+          // draw the line at the right side of the canvas
+          ctx.fillRect(800 - 1, 512 - i, 1, 1);
+        }
+        // set translate on the canvas
+        ctx.translate(-1, 0);
+        // draw the copied image
+        ctx.drawImage(tempCanvas, 0, 0, 800, 512, 0, 0, 800, 512);
+
+        // reset the transformation matrix
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+
+      var draw = function () {
+        requestAnimationFrame(draw);
+
+        analyser.getByteTimeDomainData(dataArray);
+        analyser.getByteFrequencyData(dataFArray);
+        analyser.getByteFrequencyData(array);
+
+        canvasWFCtx.fillStyle = 'rgb(0, 0, 0)';
+        canvasWFCtx.fillRect(0, 0, WIDTH_WF, HEIGHT_WF);
+
+        canvasBFCtx.fillStyle = 'rgb(0, 0, 0)';
+        canvasBFCtx.fillRect(0, 0, WIDTH_BF, HEIGHT_BF);
+
+        canvasWFCtx.lineWidth = 2;
+        canvasWFCtx.strokeStyle = 'rgb(255, 255, 255)';
+        canvasWFCtx.beginPath();
+
+        var sliceWidth = WIDTH_WF * 1.0 / bufferLength;
+        var x = 0;
+
+        for (var i = 0; i < bufferLength; i++) {
+
+          var v = dataArray[i] / 128.0;
+          var y = v * HEIGHT_WF / 2;
+
+          if (i === 0) {
+            canvasWFCtx.moveTo(x, y);
+          } else {
+            canvasWFCtx.lineTo(x, y);
+          }
+
+          x += sliceWidth;
+        }
+
+        canvasWFCtx.lineTo(canvasWF.width, canvasWF.height / 2);
+        canvasWFCtx.stroke();
+
+
+        // bar
+        var barWidth = (WIDTH_BF / bufferLength) * 2.5;
+        var barHeight;
+        var x = 0;
+        var bh;
+        for (var i = 0; i < bufferLength; i++) {
+          barHeight = dataFArray[i] / 2;
+
+          canvasBFCtx.fillStyle = 'rgba(' + (barHeight * 2.5) + ',' + (i * 2) + ',50, 1)';
+          canvasBFCtx.fillRect(x, HEIGHT_BF - barHeight / 2, barWidth, barHeight);
+
+          x += barWidth + 1;
+        }
+
+        // spectrogram
+        drawSpectrogram(array)
+
+      }
+      draw();
+
+    });
+  </script>
+</body>
+
+</html>
